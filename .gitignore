@@ -1,0 +1,6 @@
+.env
+bin/
+.DS_Store
+frontend/dashboard/node_modules/
+.codex
+
