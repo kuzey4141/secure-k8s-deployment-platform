@@ -1,49 +1,62 @@
 # Secure Kubernetes Deployment Platform
 
-Bu repo ilk olarak kucuk bir MVP ile baslar: deploy istegini alan, PostgreSQL'e kaydeden ve listeleyen bir Go API.
+A Go-based internal platform for receiving deployment requests, validating them through security and quality gates, and preparing them for safe Kubernetes delivery.
 
-## Ilk Hedef
+This repository currently contains the first MVP step: a lightweight API gateway that accepts deployment requests, stores them in PostgreSQL, and exposes endpoints for listing and inspecting deployment history.
+
+## Current MVP Scope
 
 - `POST /api/deployments`
 - `GET /api/deployments`
 - `GET /api/deployments/:id`
-- PostgreSQL migration
-- Docker Compose ile lokal PostgreSQL
+- PostgreSQL schema migration
+- Local PostgreSQL setup with Docker Compose
 
-Policy check, gRPC, Kafka, Helm ve dashboard bir sonraki asamalarda eklenecek.
+The next phases will add policy evaluation, service-to-service communication, eventing, Helm-based deployment, and observability.
 
-## Proje Yapisi
+## Why This Project?
+
+The goal of this project is not to repeat a cluster security scanning workflow. Instead, it focuses on the secure deployment path itself:
+
+- Receive deployment requests through a backend API
+- Validate requests before deployment
+- Build a foundation for policy-as-code with OPA/Rego
+- Prepare the platform for future gRPC, Kafka, Helm, Redis, and observability integrations
+
+This makes the project a good portfolio piece for backend engineering, platform engineering, Kubernetes, and cloud security.
+
+## Project Structure
 
 ```text
 backend/
-  api-gateway/      # Ilk asamada calisan tek Go servisi
-  migrations/       # PostgreSQL schema
-policies/           # Rego policy dosyalari sonraki asama icin
-docker-compose.yml  # Lokal PostgreSQL
+  api-gateway/      # The only active Go service in the current MVP
+  migrations/       # PostgreSQL schema files
+policies/           # Reserved for upcoming Rego policy files
+docker-compose.yml  # Local PostgreSQL setup
 ```
 
-## Calistirma
+## Getting Started
 
-1. PostgreSQL'i kaldir:
+1. Start PostgreSQL:
 
 ```bash
 docker compose up -d postgres
 ```
 
-2. API'yi calistir:
+2. Run the API:
 
 ```bash
 go run ./backend/api-gateway/cmd/server
 ```
 
-Varsayilan baglanti bilgileri:
+Default environment values:
 
 ```bash
 export DATABASE_URL='postgres://secure:secure@localhost:5432/secure_deploy?sslmode=disable'
 export HTTP_ADDR=':8080'
 ```
 
-## Ornek Istek
+## API Example
 
 ```bash
 curl -X POST http://localhost:8080/api/deployments \
@@ -59,12 +72,44 @@ curl -X POST http://localhost:8080/api/deployments \
   }'
 ```
 
-Listeleme:
+List deployments:
 
 ```bash
 curl http://localhost:8080/api/deployments
 ```
 
-## Sonraki Adim
+Get a single deployment by ID:
 
-Bir sonraki asamada `policies/deployment.rego` ekleyip create akisinda request'i accepted veya rejected yapacagiz.
+```bash
+curl http://localhost:8080/api/deployments/<deployment-id>
+```
+
+## Current Response Model
+
+Each deployment is currently stored with a basic lifecycle status:
+
+- `pending`
+
+In the next phase, requests will be evaluated by policy rules and will return a more meaningful result such as:
+
+- `accepted`
+- `rejected`
+
+## Roadmap
+
+Planned next steps:
+
+1. Add OPA/Rego-based policy checks to the create flow
+2. Store policy violations for rejected deployments
+3. Add a simple React dashboard
+4. Introduce gRPC between services
+5. Publish deployment events through Kafka
+6. Add Helm-based Kubernetes deployment
+7. Add Redis-backed status caching
+8. Add Prometheus and Grafana observability
+
+## Notes
+
+- `.codex` is intentionally ignored and is not part of the repository
+- The current implementation is focused on the backend MVP only
+- Helm, Kafka, Redis, Terraform, and the dashboard are planned but not yet active
