@@ -7,6 +7,7 @@ type Config struct {
 	DatabaseURL string
 }
 
+// Load reads runtime configuration from environment variables with local defaults.
 func Load() Config {
 	return Config{
 		HTTPAddr:    getEnv("HTTP_ADDR", ":8080"),
@@ -14,6 +15,7 @@ func Load() Config {
 	}
 }
 
+// getEnv returns an environment variable when present, otherwise it falls back to the provided default.
 func getEnv(key, fallback string) string {
 	if value := os.Getenv(key); value != "" {
 		return value

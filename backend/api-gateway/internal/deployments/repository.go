@@ -23,10 +23,12 @@ type CreateParams struct {
 	Status      string
 }
 
+// NewRepository creates a database-backed deployment repository.
 func NewRepository(db *sql.DB) *Repository {
 	return &Repository{db: db}
 }
 
+// Create inserts a deployment row and returns the stored record.
 func (r *Repository) Create(ctx context.Context, params CreateParams) (Deployment, error) {
 	const query = `
 		INSERT INTO deployments (
@@ -86,6 +88,7 @@ func (r *Repository) Create(ctx context.Context, params CreateParams) (Deploymen
 	return deployment, nil
 }
 
+// List returns all deployment records ordered by newest first.
 func (r *Repository) List(ctx context.Context) ([]Deployment, error) {
 	const query = `
 		SELECT
@@ -139,6 +142,7 @@ func (r *Repository) List(ctx context.Context) ([]Deployment, error) {
 	return items, nil
 }
 
+// GetByID loads a single deployment by UUID.
 func (r *Repository) GetByID(ctx context.Context, id string) (Deployment, error) {
 	const query = `
 		SELECT
@@ -181,6 +185,7 @@ func (r *Repository) GetByID(ctx context.Context, id string) (Deployment, error)
 	return deployment, nil
 }
 
+// nullIfEmpty stores optional string fields as SQL NULL instead of empty text.
 func nullIfEmpty(value string) any {
 	if value == "" {
 		return nil

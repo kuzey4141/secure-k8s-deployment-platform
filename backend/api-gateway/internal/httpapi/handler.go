@@ -3,12 +3,10 @@ package httpapi
 import (
 	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
 	"regexp"
-	"strings"
-	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/kuzey/secure-deploy-platform/backend/api-gateway/internal/deployments"
 )
 
@@ -18,129 +16,121 @@ type Handler struct {
 
 var uuidPattern = regexp.MustCompile(`^[a-fA-F0-9-]{36}$`)
 
-func New(service *deployments.Service) http.Handler {
+// New builds the Gin router and wires deployment endpoints to their handlers.
+func New(service *deployments.Service) *gin.Engine {
 	handler := &Handler{service: service}
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/healthz", handler.handleHealth)
-	mux.HandleFunc("/api/deployments", handler.handleDeployments)
-	mux.HandleFunc("/api/deployments/", handler.handleDeploymentByID)
+	router := gin.New()
+	router.Use(gin.Logger(), gin.Recovery())
+	router.HandleMethodNotAllowed = true
+	router.NoMethod(methodNotAllowed)
 
-	return loggingMiddleware(mux)
+	handler.registerHealthRoutes(router)
+	handler.registerDeploymentRoutes(router)
+
+	return router
 }
 
-func (h *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		writeError(w, http.StatusMethodNotAllowed, "method not allowed", nil)
-		return
-	}
+// registerHealthRoutes registers liveness-related endpoints.
+func (h *Handler) registerHealthRoutes(router *gin.Engine) {
+	router.GET("/healthz", h.handleHealth)
+}
 
-	writeJSON(w, http.StatusOK, map[string]string{
+// registerDeploymentRoutes registers deployment collection and detail endpoints.
+func (h *Handler) registerDeploymentRoutes(router *gin.Engine) {
+	deploymentAPI := router.Group("/api/deployments")
+	{
+		deploymentAPI.POST("", h.createDeployment)
+		deploymentAPI.GET("", h.listDeployments)
+		deploymentAPI.GET("/:id", h.getDeploymentByID)
+	}
+}
+
+// handleHealth serves a lightweight liveness endpoint for the API process.
+func (h *Handler) handleHealth(c *gin.Context) {
+	writeJSON(c, http.StatusOK, gin.H{
 		"status": "ok",
 	})
 }
 
-func (h *Handler) handleDeployments(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodPost:
-		h.createDeployment(w, r)
-	case http.MethodGet:
-		h.listDeployments(w, r)
-	default:
-		writeError(w, http.StatusMethodNotAllowed, "method not allowed", nil)
-	}
-}
-
-func (h *Handler) handleDeploymentByID(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		writeError(w, http.StatusMethodNotAllowed, "method not allowed", nil)
-		return
-	}
-
-	id := strings.TrimPrefix(r.URL.Path, "/api/deployments/")
-	if id == "" || strings.Contains(id, "/") {
-		writeError(w, http.StatusNotFound, "deployment not found", nil)
-		return
-	}
+// getDeploymentByID returns a single deployment resource for a valid UUID path segment.
+func (h *Handler) getDeploymentByID(c *gin.Context) {
+	id := c.Param("id")
 	if !uuidPattern.MatchString(id) {
-		writeError(w, http.StatusBadRequest, "invalid deployment id", nil)
+		writeError(c, http.StatusBadRequest, "invalid deployment id", nil)
 		return
 	}
 
-	deployment, err := h.service.GetByID(r.Context(), id)
+	deployment, err := h.service.GetByID(c.Request.Context(), id)
 	if errors.Is(err, deployments.ErrNotFound) {
-		writeError(w, http.StatusNotFound, "deployment not found", nil)
+		writeError(c, http.StatusNotFound, "deployment not found", nil)
 		return
 	}
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to load deployment", nil)
+		writeError(c, http.StatusInternalServerError, "failed to load deployment", nil)
 		return
 	}
 
-	writeJSON(w, http.StatusOK, deployment)
+	writeJSON(c, http.StatusOK, deployment)
 }
 
-func (h *Handler) createDeployment(w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
+// createDeployment decodes the request body, validates it, and stores a new deployment.
+func (h *Handler) createDeployment(c *gin.Context) {
+	defer c.Request.Body.Close()
 
 	var req deployments.CreateRequest
-	decoder := json.NewDecoder(r.Body)
+	decoder := json.NewDecoder(c.Request.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body", nil)
+		writeError(c, http.StatusBadRequest, "invalid request body", nil)
 		return
 	}
 
 	if issues := req.Normalize().Validate(); issues != nil {
-		writeError(w, http.StatusBadRequest, "validation failed", issues)
+		writeError(c, http.StatusBadRequest, "validation failed", issues)
 		return
 	}
 
-	deployment, err := h.service.Create(r.Context(), req)
+	deployment, err := h.service.Create(c.Request.Context(), req)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to create deployment", nil)
+		writeError(c, http.StatusInternalServerError, "failed to create deployment", nil)
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, deployment)
+	writeJSON(c, http.StatusCreated, deployment)
 }
 
-func (h *Handler) listDeployments(w http.ResponseWriter, r *http.Request) {
-	items, err := h.service.List(r.Context())
+// listDeployments returns every stored deployment in descending creation order.
+func (h *Handler) listDeployments(c *gin.Context) {
+	items, err := h.service.List(c.Request.Context())
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to list deployments", nil)
+		writeError(c, http.StatusInternalServerError, "failed to list deployments", nil)
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	writeJSON(c, http.StatusOK, gin.H{
 		"items": items,
 	})
 }
 
-func writeJSON(w http.ResponseWriter, status int, payload any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-
-	encoder := json.NewEncoder(w)
-	encoder.SetIndent("", "  ")
-	_ = encoder.Encode(payload)
+// methodNotAllowed returns a JSON 405 response for known routes with unsupported HTTP methods.
+func methodNotAllowed(c *gin.Context) {
+	writeError(c, http.StatusMethodNotAllowed, "method not allowed", nil)
 }
 
-func writeError(w http.ResponseWriter, status int, message string, details any) {
-	payload := map[string]any{
+// writeJSON serializes a response payload as formatted JSON with the given status code.
+func writeJSON(c *gin.Context, status int, payload any) {
+	c.IndentedJSON(status, payload)
+}
+
+// writeError sends a consistent JSON error response and optional details payload.
+func writeError(c *gin.Context, status int, message string, details any) {
+	payload := gin.H{
 		"error": message,
 	}
 	if details != nil {
 		payload["details"] = details
 	}
 
-	writeJSON(w, status, payload)
-}
-
-func loggingMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
-		next.ServeHTTP(w, r)
-		log.Printf("%s %s %s", r.Method, r.URL.Path, time.Since(start))
-	})
+	writeJSON(c, status, payload)
 }

@@ -18,6 +18,7 @@ import (
 	"github.com/kuzey/secure-deploy-platform/backend/api-gateway/internal/httpapi"
 )
 
+// main loads configuration, opens the database, wires dependencies, and starts the HTTP server.
 func main() {
 	cfg := config.Load()
 

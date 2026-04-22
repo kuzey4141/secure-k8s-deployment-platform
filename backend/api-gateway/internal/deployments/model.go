@@ -29,6 +29,7 @@ type CreateRequest struct {
 	Privileged  bool   `json:"privileged"`
 }
 
+// Normalize trims incoming request fields so validation and persistence use clean values.
 func (r CreateRequest) Normalize() CreateRequest {
 	r.AppName = strings.TrimSpace(r.AppName)
 	r.Image = strings.TrimSpace(r.Image)
@@ -39,6 +40,7 @@ func (r CreateRequest) Normalize() CreateRequest {
 	return r
 }
 
+// Validate checks whether the minimum required deployment fields are present and valid.
 func (r CreateRequest) Validate() map[string]string {
 	issues := map[string]string{}
 
