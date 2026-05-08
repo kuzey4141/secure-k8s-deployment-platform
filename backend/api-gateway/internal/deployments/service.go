@@ -1,19 +1,53 @@
 package deployments
 
-import "context"
+import (
+	"context"
+	"fmt"
+
+	"github.com/kuzey/secure-deploy-platform/backend/api-gateway/internal/policy"
+)
+
+type Store interface {
+	Create(ctx context.Context, params CreateParams) (Deployment, error)
+	List(ctx context.Context) ([]Deployment, error)
+	GetByID(ctx context.Context, id string) (Deployment, error)
+}
 
 type Service struct {
-	repo *Repository
+	repo      Store
+	evaluator policy.Evaluator
 }
 
 // NewService creates the deployment service layer.
-func NewService(repo *Repository) *Service {
-	return &Service{repo: repo}
+func NewService(repo Store, evaluator policy.Evaluator) *Service {
+	return &Service{
+		repo:      repo,
+		evaluator: evaluator,
+	}
 }
 
-// Create normalizes the request and saves a new deployment with the initial pending status.
+// Create normalizes the request, evaluates policy rules, and stores the request with its resulting status.
 func (s *Service) Create(ctx context.Context, req CreateRequest) (Deployment, error) {
 	req = req.Normalize()
+
+	status := "accepted"
+	if s.evaluator != nil {
+		decision, err := s.evaluator.Evaluate(ctx, policy.Input{
+			AppName:     req.AppName,
+			Image:       req.Image,
+			Namespace:   req.Namespace,
+			Replicas:    req.Replicas,
+			CPULimit:    req.CPULimit,
+			MemoryLimit: req.MemoryLimit,
+			Privileged:  req.Privileged,
+		})
+		if err != nil {
+			return Deployment{}, fmt.Errorf("evaluate deployment policies: %w", err)
+		}
+		if !decision.Allowed {
+			status = "rejected"
+		}
+	}
 
 	return s.repo.Create(ctx, CreateParams{
 		AppName:     req.AppName,
@@ -23,7 +57,7 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (Deployment, er
 		CPULimit:    req.CPULimit,
 		MemoryLimit: req.MemoryLimit,
 		Privileged:  req.Privileged,
-		Status:      "pending",
+		Status:      status,
 	})
 }
 

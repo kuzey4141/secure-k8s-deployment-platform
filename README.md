@@ -9,6 +9,7 @@ This repository currently contains the first MVP step: a lightweight API gateway
 - `POST /api/deployments`
 - `GET /api/deployments`
 - `GET /api/deployments/:id`
+- In-process OPA/Rego policy evaluation from `policies/`
 - PostgreSQL schema migration
 - Local PostgreSQL setup with Docker Compose
 
@@ -54,6 +55,7 @@ Default environment values:
 ```bash
 export DATABASE_URL='postgres://secure:secure@localhost:5432/secure_deploy?sslmode=disable'
 export HTTP_ADDR=':8080'
+export POLICY_PATH='policies'
 ```
 
 ## API Example
@@ -86,11 +88,7 @@ curl http://localhost:8080/api/deployments/<deployment-id>
 
 ## Current Response Model
 
-Each deployment is currently stored with a basic lifecycle status:
-
-- `pending`
-
-In the next phase, requests will be evaluated by policy rules and will return a more meaningful result such as:
+Each deployment request is now evaluated against Rego policy files before it is stored. The resulting lifecycle status is one of:
 
 - `accepted`
 - `rejected`

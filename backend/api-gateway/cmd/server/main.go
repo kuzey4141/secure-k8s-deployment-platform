@@ -16,6 +16,7 @@ import (
 	"github.com/kuzey/secure-deploy-platform/backend/api-gateway/internal/config"
 	"github.com/kuzey/secure-deploy-platform/backend/api-gateway/internal/deployments"
 	"github.com/kuzey/secure-deploy-platform/backend/api-gateway/internal/httpapi"
+	"github.com/kuzey/secure-deploy-platform/backend/api-gateway/internal/policy"
 )
 
 // main loads configuration, opens the database, wires dependencies, and starts the HTTP server.
@@ -36,7 +37,12 @@ func main() {
 	cancel()
 
 	repo := deployments.NewRepository(db)
-	service := deployments.NewService(repo)
+	evaluator, err := policy.NewEngine(context.Background(), cfg.PolicyPath)
+	if err != nil {
+		log.Fatalf("load policies: %v", err)
+	}
+
+	service := deployments.NewService(repo, evaluator)
 
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
