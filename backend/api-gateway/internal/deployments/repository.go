@@ -21,6 +21,7 @@ type CreateParams struct {
 	MemoryLimit string
 	Privileged  bool
 	Status      string
+	Violations  []PolicyViolation
 }
 
 // NewRepository creates a database-backed deployment repository.
@@ -30,6 +31,12 @@ func NewRepository(db *sql.DB) *Repository {
 
 // Create inserts a deployment row and returns the stored record.
 func (r *Repository) Create(ctx context.Context, params CreateParams) (Deployment, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return Deployment{}, err
+	}
+	defer tx.Rollback()
+
 	const query = `
 		INSERT INTO deployments (
 			app_name,
@@ -57,7 +64,7 @@ func (r *Repository) Create(ctx context.Context, params CreateParams) (Deploymen
 	`
 
 	var deployment Deployment
-	err := r.db.QueryRowContext(
+	err = tx.QueryRowContext(
 		ctx,
 		query,
 		params.AppName,
@@ -82,6 +89,13 @@ func (r *Repository) Create(ctx context.Context, params CreateParams) (Deploymen
 		&deployment.UpdatedAt,
 	)
 	if err != nil {
+		return Deployment{}, err
+	}
+
+	if err := insertPolicyViolations(ctx, tx, deployment.ID, params.Violations); err != nil {
+		return Deployment{}, err
+	}
+	if err := tx.Commit(); err != nil {
 		return Deployment{}, err
 	}
 
@@ -192,4 +206,35 @@ func nullIfEmpty(value string) any {
 	}
 
 	return value
+}
+
+func insertPolicyViolations(ctx context.Context, tx *sql.Tx, deploymentID string, violations []PolicyViolation) error {
+	if len(violations) == 0 {
+		return nil
+	}
+
+	const query = `
+		INSERT INTO policy_violations (
+			deployment_id,
+			control_no,
+			message,
+			severity
+		)
+		VALUES ($1::uuid, $2, $3, $4)
+	`
+
+	for _, violation := range violations {
+		if _, err := tx.ExecContext(
+			ctx,
+			query,
+			deploymentID,
+			violation.ControlNo,
+			violation.Message,
+			violation.Severity,
+		); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

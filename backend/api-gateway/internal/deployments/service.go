@@ -31,6 +31,7 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (Deployment, er
 	req = req.Normalize()
 
 	status := "accepted"
+	violations := make([]PolicyViolation, 0)
 	if s.evaluator != nil {
 		decision, err := s.evaluator.Evaluate(ctx, policy.Input{
 			AppName:     req.AppName,
@@ -44,6 +45,7 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (Deployment, er
 		if err != nil {
 			return Deployment{}, fmt.Errorf("evaluate deployment policies: %w", err)
 		}
+		violations = toPolicyViolations(decision.Violations)
 		if !decision.Allowed {
 			status = "rejected"
 		}
@@ -58,6 +60,7 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (Deployment, er
 		MemoryLimit: req.MemoryLimit,
 		Privileged:  req.Privileged,
 		Status:      status,
+		Violations:  violations,
 	})
 }
 
@@ -69,4 +72,21 @@ func (s *Service) List(ctx context.Context) ([]Deployment, error) {
 // GetByID returns one deployment record by identifier.
 func (s *Service) GetByID(ctx context.Context, id string) (Deployment, error) {
 	return s.repo.GetByID(ctx, id)
+}
+
+func toPolicyViolations(items []policy.Violation) []PolicyViolation {
+	if len(items) == 0 {
+		return nil
+	}
+
+	violations := make([]PolicyViolation, 0, len(items))
+	for _, item := range items {
+		violations = append(violations, PolicyViolation{
+			ControlNo: item.ControlNo,
+			Severity:  item.Severity,
+			Message:   item.Message,
+		})
+	}
+
+	return violations
 }

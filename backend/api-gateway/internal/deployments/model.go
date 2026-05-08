@@ -19,6 +19,12 @@ type Deployment struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
+type PolicyViolation struct {
+	ControlNo string `json:"control_no"`
+	Severity  string `json:"severity"`
+	Message   string `json:"message"`
+}
+
 type CreateRequest struct {
 	AppName     string `json:"app_name"`
 	Image       string `json:"image"`

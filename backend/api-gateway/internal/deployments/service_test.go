@@ -82,6 +82,9 @@ func TestServiceCreateAccepted(t *testing.T) {
 	if got, want := repo.created.Status, "accepted"; got != want {
 		t.Fatalf("repo status = %q, want %q", got, want)
 	}
+	if len(repo.created.Violations) != 0 {
+		t.Fatalf("repo violations = %v, want none", repo.created.Violations)
+	}
 	if got, want := evaluator.input.AppName, "payment-service"; got != want {
 		t.Fatalf("policy input app_name = %q, want %q", got, want)
 	}
@@ -92,7 +95,13 @@ func TestServiceCreateRejected(t *testing.T) {
 	evaluator := &fakeEvaluator{
 		decision: policy.Decision{
 			Allowed: false,
-			Reasons: []string{"Privileged containers are not allowed"},
+			Violations: []policy.Violation{
+				{
+					ControlNo: "control_4",
+					Severity:  "critical",
+					Message:   "Privileged containers are not allowed",
+				},
+			},
 		},
 	}
 	service := NewService(repo, evaluator)
@@ -113,6 +122,13 @@ func TestServiceCreateRejected(t *testing.T) {
 	}
 	if got, want := repo.created.Status, "rejected"; got != want {
 		t.Fatalf("repo status = %q, want %q", got, want)
+	}
+	if len(repo.created.Violations) != 1 {
+		t.Fatalf("repo violations length = %d, want 1", len(repo.created.Violations))
+	}
+	violation := repo.created.Violations[0]
+	if violation.ControlNo != "control_4" || violation.Severity != "critical" || violation.Message != "Privileged containers are not allowed" {
+		t.Fatalf("repo violation = %+v, want privileged control_4 violation", violation)
 	}
 }
 

@@ -1,0 +1,22 @@
+{
+  "control_1": {
+    "message": "CPU limit is required",
+    "severity": "high"
+  },
+  "control_2": {
+    "message": "Memory limit is required",
+    "severity": "high"
+  },
+  "control_3": {
+    "message": "Image tag 'latest' cannot be used",
+    "severity": "high"
+  },
+  "control_4": {
+    "message": "Privileged containers are not allowed",
+    "severity": "critical"
+  },
+  "control_5": {
+    "message": "Production deployments must have at least 2 replicas",
+    "severity": "medium"
+  }
+}

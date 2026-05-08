@@ -10,10 +10,12 @@ This repository currently contains the first MVP step: a lightweight API gateway
 - `GET /api/deployments`
 - `GET /api/deployments/:id`
 - In-process OPA/Rego policy evaluation from `policies/`
+- Shared control metadata from `policies/controls.json`
+- Rejected deployment violations stored in PostgreSQL
 - PostgreSQL schema migration
 - Local PostgreSQL setup with Docker Compose
 
-The next phases will add policy evaluation, service-to-service communication, eventing, Helm-based deployment, and observability.
+The next phases will add richer policy reporting, service-to-service communication, eventing, Helm-based deployment, and observability.
 
 ## Why This Project?
 
@@ -32,7 +34,7 @@ This makes the project a good portfolio piece for backend engineering, platform 
 backend/
   api-gateway/      # The only active Go service in the current MVP
   migrations/       # PostgreSQL schema files
-policies/           # Reserved for upcoming Rego policy files
+policies/           # Rego controls plus shared JSON control metadata
 docker-compose.yml  # Local PostgreSQL setup
 ```
 
@@ -88,23 +90,26 @@ curl http://localhost:8080/api/deployments/<deployment-id>
 
 ## Current Response Model
 
-Each deployment request is now evaluated against Rego policy files before it is stored. The resulting lifecycle status is one of:
+Each deployment request is now evaluated against Rego control files before it is stored. Shared metadata such as `severity` and `message` comes from `policies/controls.json`.
+
+The resulting lifecycle status is one of:
 
 - `accepted`
 - `rejected`
+
+Rejected requests also create `policy_violations` rows linked to the deployment record.
 
 ## Roadmap
 
 Planned next steps:
 
-1. Add OPA/Rego-based policy checks to the create flow
-2. Store policy violations for rejected deployments
-3. Add a simple React dashboard
-4. Introduce gRPC between services
-5. Publish deployment events through Kafka
-6. Add Helm-based Kubernetes deployment
-7. Add Redis-backed status caching
-8. Add Prometheus and Grafana observability
+1. Return stored policy violations from deployment detail endpoints
+2. Add a simple React dashboard
+3. Introduce gRPC between services
+4. Publish deployment events through Kafka
+5. Add Helm-based Kubernetes deployment
+6. Add Redis-backed status caching
+7. Add Prometheus and Grafana observability
 
 ## Notes
 

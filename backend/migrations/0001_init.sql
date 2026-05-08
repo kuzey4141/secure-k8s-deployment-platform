@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS deployments (
 CREATE TABLE IF NOT EXISTS policy_violations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     deployment_id UUID NOT NULL REFERENCES deployments(id) ON DELETE CASCADE,
-    policy_name TEXT NOT NULL,
+    control_no TEXT NOT NULL,
     message TEXT NOT NULL,
     severity TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

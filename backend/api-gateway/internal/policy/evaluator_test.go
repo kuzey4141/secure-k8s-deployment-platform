@@ -23,10 +23,10 @@ func TestEngineEvaluateAccepted(t *testing.T) {
 		t.Fatalf("Evaluate returned error: %v", err)
 	}
 	if !decision.Allowed {
-		t.Fatalf("decision allowed = false, want true; reasons: %v", decision.Reasons)
+		t.Fatalf("decision allowed = false, want true; violations: %v", decision.Violations)
 	}
-	if len(decision.Reasons) != 0 {
-		t.Fatalf("decision reasons = %v, want none", decision.Reasons)
+	if len(decision.Violations) != 0 {
+		t.Fatalf("decision violations = %v, want none", decision.Violations)
 	}
 }
 
@@ -46,9 +46,22 @@ func TestEngineEvaluateRejected(t *testing.T) {
 	if decision.Allowed {
 		t.Fatal("decision allowed = true, want false")
 	}
-	if len(decision.Reasons) != 5 {
-		t.Fatalf("decision reasons length = %d, want 5", len(decision.Reasons))
+	if len(decision.Violations) != 5 {
+		t.Fatalf("decision violations length = %d, want 5", len(decision.Violations))
 	}
+	if !hasViolation(decision.Violations, "control_4", "critical", "Privileged containers are not allowed") {
+		t.Fatalf("expected privileged violation in %+v", decision.Violations)
+	}
+}
+
+func hasViolation(items []Violation, controlNo, severity, message string) bool {
+	for _, item := range items {
+		if item.ControlNo == controlNo && item.Severity == severity && item.Message == message {
+			return true
+		}
+	}
+
+	return false
 }
 
 func mustNewEngine(t *testing.T) *Engine {
