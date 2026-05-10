@@ -196,6 +196,12 @@ func (r *Repository) GetByID(ctx context.Context, id string) (Deployment, error)
 		return Deployment{}, err
 	}
 
+	violations, err := r.listPolicyViolationsByDeploymentID(ctx, deployment.ID)
+	if err != nil {
+		return Deployment{}, err
+	}
+	deployment.Violations = violations
+
 	return deployment, nil
 }
 
@@ -237,4 +243,42 @@ func insertPolicyViolations(ctx context.Context, tx *sql.Tx, deploymentID string
 	}
 
 	return nil
+}
+
+func (r *Repository) listPolicyViolationsByDeploymentID(ctx context.Context, deploymentID string) ([]PolicyViolation, error) {
+	const query = `
+		SELECT
+			control_no,
+			severity,
+			message
+		FROM policy_violations
+		WHERE deployment_id = $1::uuid
+		ORDER BY created_at ASC, control_no ASC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, deploymentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	violations := make([]PolicyViolation, 0)
+	for rows.Next() {
+		var violation PolicyViolation
+		if err := rows.Scan(
+			&violation.ControlNo,
+			&violation.Severity,
+			&violation.Message,
+		); err != nil {
+			return nil, err
+		}
+
+		violations = append(violations, violation)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return violations, nil
 }

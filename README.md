@@ -99,17 +99,18 @@ The resulting lifecycle status is one of:
 
 Rejected requests also create `policy_violations` rows linked to the deployment record.
 
+When a deployment has stored violations, `GET /api/deployments/:id` now includes a `violations` array in the response.
+
 ## Roadmap
 
 Planned next steps:
 
-1. Return stored policy violations from deployment detail endpoints
-2. Add a simple React dashboard
-3. Introduce gRPC between services
-4. Publish deployment events through Kafka
-5. Add Helm-based Kubernetes deployment
-6. Add Redis-backed status caching
-7. Add Prometheus and Grafana observability
+1. Add a simple React dashboard
+2. Introduce gRPC between services
+3. Publish deployment events through Kafka
+4. Add Helm-based Kubernetes deployment
+5. Add Redis-backed status caching
+6. Add Prometheus and Grafana observability
 
 ## Notes
 

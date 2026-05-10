@@ -6,17 +6,18 @@ import (
 )
 
 type Deployment struct {
-	ID          string    `json:"id"`
-	AppName     string    `json:"app_name"`
-	Image       string    `json:"image"`
-	Namespace   string    `json:"namespace"`
-	Replicas    int       `json:"replicas"`
-	CPULimit    string    `json:"cpu_limit,omitempty"`
-	MemoryLimit string    `json:"memory_limit,omitempty"`
-	Privileged  bool      `json:"privileged"`
-	Status      string    `json:"status"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID          string            `json:"id"`
+	AppName     string            `json:"app_name"`
+	Image       string            `json:"image"`
+	Namespace   string            `json:"namespace"`
+	Replicas    int               `json:"replicas"`
+	CPULimit    string            `json:"cpu_limit,omitempty"`
+	MemoryLimit string            `json:"memory_limit,omitempty"`
+	Privileged  bool              `json:"privileged"`
+	Status      string            `json:"status"`
+	Violations  []PolicyViolation `json:"violations,omitempty"`
+	CreatedAt   time.Time         `json:"created_at"`
+	UpdatedAt   time.Time         `json:"updated_at"`
 }
 
 type PolicyViolation struct {

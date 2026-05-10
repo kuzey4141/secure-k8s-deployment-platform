@@ -9,9 +9,11 @@ import (
 )
 
 type fakeStore struct {
-	created CreateParams
-	result  Deployment
-	err     error
+	created       CreateParams
+	result        Deployment
+	err           error
+	getByIDResult Deployment
+	getByIDErr    error
 }
 
 func (s *fakeStore) Create(_ context.Context, params CreateParams) (Deployment, error) {
@@ -39,7 +41,11 @@ func (s *fakeStore) List(context.Context) ([]Deployment, error) {
 }
 
 func (s *fakeStore) GetByID(context.Context, string) (Deployment, error) {
-	return Deployment{}, nil
+	if s.getByIDErr != nil {
+		return Deployment{}, s.getByIDErr
+	}
+
+	return s.getByIDResult, nil
 }
 
 type fakeEvaluator struct {
@@ -150,5 +156,35 @@ func TestServiceCreatePolicyError(t *testing.T) {
 	}
 	if repo.created.Status != "" {
 		t.Fatalf("repo Create should not be called when policy evaluation fails, got status %q", repo.created.Status)
+	}
+}
+
+func TestServiceGetByIDIncludesViolations(t *testing.T) {
+	repo := &fakeStore{
+		getByIDResult: Deployment{
+			ID:      "deployment-id",
+			AppName: "payment-service",
+			Status:  "rejected",
+			Violations: []PolicyViolation{
+				{
+					ControlNo: "control_4",
+					Severity:  "critical",
+					Message:   "Privileged containers are not allowed",
+				},
+			},
+		},
+	}
+	service := NewService(repo, nil)
+
+	deployment, err := service.GetByID(context.Background(), "deployment-id")
+	if err != nil {
+		t.Fatalf("GetByID returned error: %v", err)
+	}
+
+	if len(deployment.Violations) != 1 {
+		t.Fatalf("violations length = %d, want 1", len(deployment.Violations))
+	}
+	if got, want := deployment.Violations[0].ControlNo, "control_4"; got != want {
+		t.Fatalf("control_no = %q, want %q", got, want)
 	}
 }
